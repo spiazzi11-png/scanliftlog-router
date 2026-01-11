@@ -45,17 +45,8 @@
     footer { margin:16px 0 6px; text-align:center; color:var(--g); font-size:12px; }
     footer a { color:inherit; }
 
-    /* NEW: Footer download button style */
-    .footerBtn{
-      border:1px solid var(--l);
-      background:#fff;
-      padding:6px 10px;
-      border-radius:999px;
-      font-weight:900;
-      cursor:pointer;
-      font-size:12px;
-    }
-    .footerBtn:hover{ opacity:0.85; }
+    /* Tiny helper button inside pills */
+    .pillBtn { border:0; background:transparent; cursor:pointer; font-weight:900; text-decoration:underline; padding:0; font-size:12px; opacity:.85; }
   </style>
 </head>
 <body>
@@ -63,13 +54,15 @@
     <div class="top">
       <div>
         <h1>ScanLiftLog</h1>
-        <div class="sub">Scan a machine QR code to view and log your workout history.</div>
+        <div class="sub" id="subLine">Scan a machine QR code to view and log your workout history.</div>
       </div>
 
       <div class="pills">
+        <div class="pill" id="gymPill">Gym: …</div>
         <div class="pill" id="machinePill">Loading…</div>
         <div class="pill" id="userPill">User: …</div>
-        <div class="pill"><button class="smalllink" id="resetUserBtn" type="button">Reset User ID</button></div>
+        <div class="pill"><button class="pillBtn" id="downloadBtn" type="button">Download Data</button></div>
+        <div class="pill"><button class="pillBtn" id="resetUserBtn" type="button">Reset User ID</button></div>
       </div>
     </div>
 
@@ -145,25 +138,30 @@
       </div>
 
       <div class="muted" style="margin-top:10px;">
-        Example QR link format:
-        <span class="badge">?machine=SHPR</span>
+        Example QR link formats:
+        <span class="badge">?machine=LEGPR</span>
+        <span class="badge">/m/legpr</span>
+        <span class="badge">https://scanliftlog.com/g/main/m/legpr</span>
       </div>
     </div>
 
-    <!-- UPDATED FOOTER: adds Download button -->
     <footer>
       © <span id="year"></span> ScanLiftLog •
       <a href="https://spiazzi11-png.github.io/scanliftlog/" target="_blank" rel="noopener">Home</a>
-      <span> • </span>
-      <button id="exportBtn" type="button" class="footerBtn">Download My Data</button>
     </footer>
   </div>
 
 <script>
+/* ================================
+   IMPORTANT DEPLOYMENT NOTE
+   ================================
+   For deep links like /m/legpr to work on GitHub Pages, you MUST create 404.html in this repo
+   and paste this exact same file into 404.html as well.
+*/
+
 /* ---------- Utilities ---------- */
-function getQueryParam(name) {
-  const url = new URL(window.location.href);
-  return url.searchParams.get(name);
+function safeJSONParse(s, fallback) {
+  try { return JSON.parse(s); } catch { return fallback; }
 }
 function todayISO() {
   const d = new Date();
@@ -175,13 +173,62 @@ function todayISO() {
 function nowReadable() {
   return new Date().toLocaleString();
 }
-function safeJSONParse(s, fallback) {
-  try { return JSON.parse(s); } catch { return fallback; }
-}
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
   }[m]));
+}
+function normalizeSlug(v) {
+  return String(v || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/* ---------- URL Parsing (FIXED + ROBUST) ---------- */
+/**
+ * Supports:
+ *  - ?machine=LEGPR
+ *  - /m/legpr
+ *  - /g/<gymId>/m/<machineId>
+ *  - optional ?gym=main
+ *
+ * Robust rule: find the LAST "m" segment in the path, so repo base paths never break parsing.
+ */
+function parseContextFromUrl() {
+  const url = new URL(window.location.href);
+
+  // Query params
+  let gym = url.searchParams.get("gym") || "";
+  let machine = url.searchParams.get("machine") || "";
+
+  // Path segments (works for both GH Pages: /scanliftlog/... and bare domain: /...)
+  const parts = url.pathname.split("/").filter(Boolean);
+
+  // Find last "m"
+  let mIndex = -1;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (parts[i] === "m") { mIndex = i; break; }
+  }
+  if (!machine && mIndex !== -1 && parts[mIndex + 1]) {
+    machine = parts[mIndex + 1];
+  }
+
+  // Find last "g"
+  let gIndex = -1;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (parts[i] === "g") { gIndex = i; break; }
+  }
+  if (!gym && gIndex !== -1 && parts[gIndex + 1]) {
+    gym = parts[gIndex + 1];
+  }
+
+  const gymId = normalizeSlug(gym) || "main";
+  const machineId = machine ? normalizeSlug(machine).toUpperCase() : null;
+
+  return { gymId, machineId };
 }
 
 /* ---------- User ID (device-local) ---------- */
@@ -201,8 +248,18 @@ function resetUser() {
 
 /* ---------- UI State ---------- */
 const userId = getOrCreateUserId();
-const machineParam = getQueryParam('machine');
-const machineId = machineParam ? machineParam.trim().toUpperCase() : null;
+const ctx = parseContextFromUrl();
+const gymId = ctx.gymId;
+const machineId = ctx.machineId;
+
+/* ---------- Gym Map (optional display names) ---------- */
+const GYM_MAP = {
+  "main": "ScanLiftLog Test Gym"
+  // Add more display names if you want:
+  // "peters": "Peters Gym",
+  // "smithtown": "Smithtown Fitness"
+};
+const gymName = GYM_MAP[gymId] || gymId.toUpperCase();
 
 /* ---------- Machine Map (expanded) ---------- */
 const MACHINE_MAP = {
@@ -343,42 +400,37 @@ function saveWorkouts(arr) {
   localStorage.setItem(storageKeyFor(machineId), JSON.stringify(arr));
 }
 
-/* NEW: Export all machines for this user from localStorage */
-function exportAllDataForUser() {
-  const prefix = `scanliftlog_workouts_v1:${userId}:`;
-
-  const exportObj = {
-    app: "ScanLiftLog",
-    version: "v1",
-    exportedAt: new Date().toISOString(),
-    userId: userId,
-    machines: {}
-  };
-
+/* ---------- Download Data ---------- */
+function downloadData() {
+  const all = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (!k || !k.startsWith(prefix)) continue;
-
-    const mid = k.slice(prefix.length); // e.g. "DBRCK"
-    const raw = localStorage.getItem(k);
-    exportObj.machines[mid] = safeJSONParse(raw || "[]", []);
+    if (!k) continue;
+    if (k.startsWith("scanliftlog_workouts_v1:")) {
+      all.push({ key: k, value: safeJSONParse(localStorage.getItem(k) || "null", null) });
+    }
+    if (k === USER_KEY) {
+      all.push({ key: k, value: localStorage.getItem(k) });
+    }
   }
 
-  if (Object.keys(exportObj.machines).length === 0) {
-    alert("No saved workouts found on this device to download yet.");
-    return;
-  }
+  const payload = {
+    exportedAt: nowReadable(),
+    gymId,
+    gymName,
+    userId,
+    currentMachineId: machineId,
+    data: all
+  };
 
-  const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
-  a.download = `scanliftlog_export_${userId.slice(0,8)}_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `scanliftlog_export_${gymId}_${userId.slice(0,8)}_${Date.now()}.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
-
   URL.revokeObjectURL(url);
 }
 
@@ -509,13 +561,12 @@ function renderHistory() {
 
 /* ---------- Wire up ---------- */
 document.getElementById('year').textContent = String(new Date().getFullYear());
+document.getElementById('gymPill').textContent = `Gym: ${gymName}`;
 document.getElementById('machinePill').textContent = machineName;
 document.getElementById('userPill').textContent = `User: ${userId.slice(0,8)}…`;
 document.getElementById('historyScopeBadge').textContent = `Scope: ${machineId || "—"}`;
 document.getElementById('resetUserBtn').addEventListener('click', resetUser);
-
-/* NEW: Wire export button */
-document.getElementById('exportBtn').addEventListener('click', exportAllDataForUser);
+document.getElementById('downloadBtn').addEventListener('click', downloadData);
 
 dateInput.value = todayISO();
 
@@ -542,8 +593,6 @@ document.getElementById('saveWorkoutBtn').addEventListener('click', () => {
   workouts.push({
     ts: Date.now(),
     date,
-    machineId,
-    machineName,
     exercise,
     notes,
     sets,
