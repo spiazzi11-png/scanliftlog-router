@@ -4,350 +4,568 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ScanLiftLog</title>
-  <meta name="robots" content="noindex,nofollow" />
   <style>
-    :root { --b:#111; --g:#666; --bg:#f6f7fb; --card:#fff; --line:#e6e8f0; }
+    :root { --b:#111; --g:#666; --l:#e7e7e7; --bg:#fafafa; --card:#fff; }
     body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--b); }
-    .wrap { max-width: 860px; margin: 36px auto; padding: 0 16px; }
-    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 14px; }
-    .brand { font-weight: 800; letter-spacing:.2px; font-size: 18px; }
-    .tag { display:inline-block; font-size: 12px; border:1px solid var(--line); background:#fff; padding: 6px 10px; border-radius: 999px; color: var(--g); }
-    .card { background:var(--card); border:1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.05); padding: 18px; }
-    .grid { display:grid; grid-template-columns: 1fr; gap:12px; }
-    @media (min-width: 860px){ .grid { grid-template-columns: 1.2fr .8fr; } }
-    h1 { margin: 0 0 6px; font-size: 22px; }
-    p { margin: 0 0 12px; color: var(--g); line-height: 1.5; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    label { font-size: 12px; color: var(--g); display:block; margin: 0 0 4px; }
-    input, select, button, textarea {
-      font: inherit;
-      border:1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 10px;
+    .wrap { max-width: 900px; margin: 0 auto; padding: 18px; }
+    .top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    h1 { margin:0; font-size: 20px; letter-spacing: .2px; }
+    .sub { margin:6px 0 0; color:var(--g); font-size: 13px; }
+    .pills { display:flex; gap:8px; flex-wrap:wrap; }
+    .pill { font-size:12px; padding:8px 10px; border:1px solid var(--l); background:#fff; border-radius:999px; }
+    .card { margin-top:14px; background:var(--card); border:1px solid var(--l); border-radius:14px; padding:14px; }
+    label { display:block; font-size: 12px; color:var(--g); margin: 0 0 6px; }
+    input { width: 100%; box-sizing:border-box; padding:10px 12px; border:1px solid #ddd; border-radius:12px; font-size:14px; background:#fff; }
+    button { padding:10px 12px; border-radius:12px; border:1px solid #ddd; background:#fff; cursor:pointer; font-weight:800; }
+    button.primary { border:0; background:#111; color:#fff; }
+    button.danger { border:0; background:#b00020; color:#fff; }
+    .btnrow { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; }
+    .col { flex:1; min-width: 220px; }
+    .muted { color:var(--g); font-size:12px; }
+    .hr { height:1px; background:var(--l); margin:14px 0; }
+    .smalllink { border:0; background:transparent; text-decoration:underline; cursor:pointer; font-size:12px; opacity:0.75; padding:0; font-weight:700; }
+    .badge { display:inline-block; font-size:11px; padding:4px 8px; border:1px solid var(--l); border-radius:999px; background:#fff; color:var(--g); }
+
+    /* Sets grid */
+    .setsHeader { display:grid; grid-template-columns: 52px 1fr 1fr 60px; gap:10px; align-items:center; margin-top:10px; }
+    .setRow { display:grid; grid-template-columns: 52px 1fr 1fr 60px; gap:10px; align-items:center; margin-top:10px; }
+    .setBadge { display:inline-flex; align-items:center; justify-content:center; width:48px; height:40px; border:1px solid var(--l); border-radius:12px; background:#fff; font-weight:900; }
+    .iconBtn { width:44px; height:40px; border-radius:12px; border:1px solid #ddd; display:inline-flex; align-items:center; justify-content:center; font-size:18px; font-weight:900; background:#fff; }
+    .iconBtn.primary { background:#111; color:#fff; border:0; }
+    .iconBtn.danger { background:#b00020; color:#fff; border:0; }
+
+    /* History */
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--l); font-size: 13px; vertical-align:top; }
+    th { color:var(--g); font-weight:900; font-size:12px; }
+    details summary { cursor:pointer; font-weight:900; }
+    .setsMini { margin-top:8px; width:100%; border-collapse:collapse; }
+    .setsMini td, .setsMini th { font-size: 12px; padding:6px 6px; border-bottom:1px solid var(--l); }
+    footer { margin:16px 0 6px; text-align:center; color:var(--g); font-size:12px; }
+    footer a { color:inherit; }
+
+    /* NEW: Footer download button style */
+    .footerBtn{
+      border:1px solid var(--l);
       background:#fff;
-      color: var(--b);
+      padding:6px 10px;
+      border-radius:999px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:12px;
     }
-    input, select { min-width: 160px; }
-    button { cursor:pointer; font-weight: 700; }
-    button.primary { background:#111; color:#fff; border-color:#111; }
-    button.danger { background:#fff; color:#b00020; border-color:#f0c9d1; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background:#f1f3f8; padding: 10px; border-radius: 10px; border:1px solid var(--line); overflow:auto; }
-    .hr { height:1px; background: var(--line); margin: 14px 0; }
-    .list { display:flex; flex-direction:column; gap:10px; }
-    .item { border:1px solid var(--line); border-radius: 12px; padding: 12px; background:#fff; }
-    .item .meta { font-size: 12px; color: var(--g); margin-top: 6px; }
-    .small { font-size: 12px; color: var(--g); margin-top: 10px; }
-    .warn { color:#8a5a00; }
+    .footerBtn:hover{ opacity:0.85; }
   </style>
 </head>
-
 <body>
   <div class="wrap">
     <div class="top">
-      <div class="brand">ScanLiftLog</div>
-      <div class="tag" id="contextTag">Loading…</div>
-    </div>
-
-    <div class="grid">
-      <!-- LEFT: Logging -->
-      <div class="card">
-        <h1 id="machineTitle">Choose a machine</h1>
-        <p id="machineSubtitle">Scan a QR code on a machine to load its log screen automatically.</p>
-
-        <div class="row">
-          <div>
-            <label for="machineInput">Machine ID</label>
-            <input id="machineInput" placeholder="e.g., legpr" />
-          </div>
-
-          <div>
-            <label for="exerciseInput">Exercise</label>
-            <input id="exerciseInput" placeholder="Optional note (e.g., Leg Press)" />
-          </div>
-
-          <div>
-            <label for="weightInput">Weight</label>
-            <input id="weightInput" inputmode="decimal" placeholder="e.g., 270" />
-          </div>
-
-          <div>
-            <label for="repsInput">Reps</label>
-            <input id="repsInput" inputmode="numeric" placeholder="e.g., 10" />
-          </div>
-
-          <div style="align-self:flex-end;">
-            <button class="primary" id="saveBtn">Save Set</button>
-          </div>
-        </div>
-
-        <div class="small">
-          Supports both formats:
-          <div class="mono" style="margin-top:8px;">
-            Old:  ?machine=LEGPR<br/>
-            New:  /m/legpr  (from your router redirect)
-          </div>
-        </div>
-
-        <div class="hr"></div>
-
-        <div class="row">
-          <button id="shareBtn">Copy QR Test Link</button>
-          <button class="danger" id="clearBtn">Clear This Machine</button>
-        </div>
-
-        <div class="small warn" id="statusLine"></div>
+      <div>
+        <h1>ScanLiftLog</h1>
+        <div class="sub">Scan a machine QR code to view and log your workout history.</div>
       </div>
 
-      <!-- RIGHT: History -->
-      <div class="card">
-        <h1 style="margin-bottom:10px;">History</h1>
-        <div id="history" class="list"></div>
-        <div class="small" id="historyFoot"></div>
+      <div class="pills">
+        <div class="pill" id="machinePill">Loading…</div>
+        <div class="pill" id="userPill">User: …</div>
+        <div class="pill"><button class="smalllink" id="resetUserBtn" type="button">Reset User ID</button></div>
       </div>
     </div>
+
+    <!-- Logger -->
+    <div class="card">
+      <div class="row" style="align-items:flex-end;">
+        <div class="col">
+          <label>Date</label>
+          <input id="dateInput" type="date" />
+        </div>
+        <div class="col">
+          <label>Notes (optional)</label>
+          <input id="notesInput" placeholder="e.g., controlled reps, last set to failure" />
+        </div>
+      </div>
+
+      <!-- Exercise field (moved inside card, under Notes) -->
+      <div class="row" style="align-items:flex-end; margin-top:12px;">
+        <div class="col">
+          <label>Exercise (optional)</label>
+          <input id="exerciseInput" placeholder="e.g., Dumbbell Flys, DB Press, Incline DB Row" />
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div style="font-weight:900;">Sets</div>
+      <div class="muted" style="margin-top:6px;">Use + to add sets. Each set stores weight and reps.</div>
+
+      <div class="setsHeader">
+        <div class="muted">Set</div>
+        <div class="muted">Weight</div>
+        <div class="muted">Reps</div>
+        <div class="muted">Del</div>
+      </div>
+
+      <div id="setsContainer"></div>
+
+      <div class="btnrow" style="margin-top:12px;">
+        <button class="iconBtn primary" id="addSetBtn" type="button">+</button>
+        <div class="muted">Add set</div>
+      </div>
+
+      <div class="btnrow" style="margin-top:14px;">
+        <button class="primary" id="saveWorkoutBtn" type="button">Save Workout</button>
+        <button id="clearCurrentBtn" type="button">Clear Current Sets</button>
+        <button class="danger" id="clearHistoryBtn" type="button">Clear All History (this machine)</button>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <div style="font-weight:900;">History</div>
+        <div class="badge" id="historyScopeBadge">Scope: …</div>
+      </div>
+
+      <div style="margin-top:10px; overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="min-width:110px;">Date</th>
+              <th style="min-width:70px;">Sets</th>
+              <th style="min-width:120px;">Top Set</th>
+              <th>Details</th>
+              <th style="min-width:140px;">Saved</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="5" class="muted">No workouts saved yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="muted" style="margin-top:10px;">
+        Example QR link format:
+        <span class="badge">?machine=SHPR</span>
+      </div>
+    </div>
+
+    <!-- UPDATED FOOTER: adds Download button -->
+    <footer>
+      © <span id="year"></span> ScanLiftLog •
+      <a href="https://spiazzi11-png.github.io/scanliftlog/" target="_blank" rel="noopener">Home</a>
+      <span> • </span>
+      <button id="exportBtn" type="button" class="footerBtn">Download My Data</button>
+    </footer>
   </div>
 
-  <script>
-    /**
-     * ScanLiftLog (Gym App)
-     * Paste this SAME file into both index.html and 404.html in your gym repo.
-     *
-     * Why: GitHub Pages returns 404 for deep links like /m/legpr unless you provide a 404.html fallback.
-     * This is a typical “SPA on GitHub Pages” approach.
-     */
+<script>
+/* ---------- Utilities ---------- */
+function getQueryParam(name) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(name);
+}
+function todayISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function nowReadable() {
+  return new Date().toLocaleString();
+}
+function safeJSONParse(s, fallback) {
+  try { return JSON.parse(s); } catch { return fallback; }
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[m]));
+}
 
-    // ---- Config (for your current test gym) ----
-    // This gymId is only used for the "Copy QR Test Link" helper button.
-    // Your router controls real gym routing; this can remain "main" for now.
-    const DEFAULT_GYM_SLUG = "main";
+/* ---------- User ID (device-local) ---------- */
+const USER_KEY = 'scanliftlog_user_v1';
+function getOrCreateUserId() {
+  let id = localStorage.getItem(USER_KEY);
+  if (!id) {
+    id = 'u_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+    localStorage.setItem(USER_KEY, id);
+  }
+  return id;
+}
+function resetUser() {
+  localStorage.removeItem(USER_KEY);
+  location.reload();
+}
 
-    // ---- Helpers ----
-    const $ = (id) => document.getElementById(id);
+/* ---------- UI State ---------- */
+const userId = getOrCreateUserId();
+const machineParam = getQueryParam('machine');
+const machineId = machineParam ? machineParam.trim().toUpperCase() : null;
 
-    function normalizeSlug(v) {
-      return String(v || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
-    }
+/* ---------- Machine Map (expanded) ---------- */
+const MACHINE_MAP = {
+  // Your originals
+  "CHPR": "Flat Chest Press",
+  "INCHPR": "Incline Chest Press",
+  "DECHPR": "Decline Chest Press",
+  "PECDK": "Pec Deck / Chest Fly",
+  "CABFLY": "Cable Fly (Chest)",
+  "SMTH": "Smith Machine",
 
-    function getMachineFromUrl() {
-      const url = new URL(window.location.href);
+  "SHPR": "Shoulder Press",
+  "LATRL": "Lateral Raise",
+  "RDLT": "Rear Delt Fly",
+  "UPROW": "Upright Row",
 
-      // 1) Query param support (old)
-      let m = url.searchParams.get("machine");
-      if (m) return normalizeSlug(m);
+  "LATPD": "Lat Pulldown",
+  "SETRW": "Seated Row",
+  "HIRW": "High Row",
+  "ASSTPD": "Assisted Pull-Up / Dip",
+  "STRPD": "Straight-Arm Pulldown",
+  "BKEXT": "Back Extension",
 
-      // 2) Path support (new): /m/<machineId>
-      const parts = url.pathname.split("/").filter(Boolean);
-      const mIndex = parts.indexOf("m");
-      if (mIndex !== -1 && parts[mIndex + 1]) return normalizeSlug(parts[mIndex + 1]);
+  "LEGPR": "Leg Press",
+  "HKSQ": "Hack Squat",
+  "SQMT": "Squat Machine",
+  "LEGEX": "Leg Extension",
+  "SLCUR": "Seated Leg Curl",
+  "LLCUR": "Lying Leg Curl",
+  "STCUR": "Standing Leg Curl",
+  "HIPAB": "Hip Abductor",
+  "HIPAD": "Hip Adductor",
+  "GLUTKB": "Glute Kickback",
+  "SCALF": "Seated Calf Raise",
+  "STCALF": "Standing Calf Raise",
 
-      return "";
-    }
+  "PRCUR": "Preacher Curl",
+  "BICUR": "Biceps Curl Machine",
+  "CABCRL": "Cable Curl Station",
+  "TRIEX": "Triceps Extension Machine",
+  "DIPMT": "Dip Machine",
+  "CABPD": "Cable Pushdown Station",
 
-    function setMachineInUrl(machineId) {
-      const m = normalizeSlug(machineId);
-      const url = new URL(window.location.href);
+  "ABCR": "Ab Crunch Machine",
+  "RTTOR": "Rotary Torso",
+  "CAPCH": "Captain’s Chair",
+  "DABEN": "Decline Ab Bench",
+  "CABAB": "Cable Crunch Station",
 
-      // We will standardize on path form: /m/<machineId>
-      // Keep it simple: if you're hosted at /scanliftlog/ on GitHub Pages, preserve that base path.
-      // Example base path on GH Pages: /scanliftlog/
-      // This script lives at that base, so we keep the first segment as the repo name when present.
-      const parts = url.pathname.split("/").filter(Boolean);
-      const repoBase = parts.length ? parts[0] : ""; // "scanliftlog" (repo name) on GH Pages
+  "FBEN": "Flat Bench",
+  "IBEN": "Incline Bench",
+  "DBEN": "Decline Bench",
+  "SQRK": "Squat Rack",
+  "PWRK": "Power Rack",
+  "DBRCK": "Dumbbell Rack",
 
-      const newPath = repoBase ? `/${repoBase}/m/${m}` : `/m/${m}`;
-      url.pathname = newPath;
+  "TRED": "Treadmill",
+  "ELIP": "Elliptical",
+  "STAIR": "Stair Climber",
+  "BIKE": "Stationary Bike",
+  "ROW": "Rower",
 
-      // Remove old query param if present
-      url.searchParams.delete("machine");
+  // 50+ additional common gym equipment types
+  "CROSS": "Cable Crossover / Functional Trainer",
+  "CABLE": "Cable Station (Single)",
+  "LATISO": "Iso-Lateral Lat Pulldown",
+  "LTRW": "Low Row Machine",
+  "TBRW": "T-Bar Row Station",
+  "CHSRW": "Chest-Supported Row",
+  "PLOVR": "Pullover Machine",
+  "FACEP": "Face Pull Station",
+  "PULUP": "Pull-Up Bar / Rig",
+  "CHINB": "Chin-Up Bar",
+  "INVRT": "Inverted Row Station",
 
-      window.history.replaceState({}, "", url.toString());
-    }
+  "BPBEN": "Barbell Bench Press (Bench)",
+  "IBPBN": "Incline Barbell Bench Press (Bench)",
+  "DBBEN": "Dumbbell Bench Press (Bench)",
+  "IDBBN": "Incline Dumbbell Bench Press (Bench)",
+  "LANDM": "Landmine Station",
+  "JMPPR": "Jammer Press",
+  "DPPRS": "Dip Station",
+  "CHDIP": "Chest Dip Machine",
+  "OHPRS": "Overhead Press Station",
+  "SHRUG": "Shrug Machine",
 
-    function storageKey(machineId) {
-      return `scanliftlog:machine:${normalizeSlug(machineId)}:sets`;
-    }
+  "GLBRG": "Glute Bridge / Hip Thrust Bench",
+  "HIPTH": "Hip Thrust Machine",
+  "BLSQT": "Belt Squat Machine",
+  "VLEG": "Vertical Leg Press",
+  "PENDL": "Pendulum Squat",
+  "SISSY": "Sissy Squat Bench",
+  "GHR": "Glute-Ham Raise (GHD)",
+  "SLED": "Sled Push Track",
+  "LUNGE": "Lunge Station",
+  "SQTST": "Squat Stand / Platform",
 
-    function readSets(machineId) {
-      try {
-        const raw = localStorage.getItem(storageKey(machineId));
-        return raw ? JSON.parse(raw) : [];
-      } catch {
-        return [];
-      }
-    }
+  "HAMMR": "Hammer Strength Curl (Iso)",
+  "TRIDP": "Triceps Dip/Press Machine",
+  "SKULL": "Skull Crushers Bench Area",
+  "CLOSEB": "Close-Grip Bench Area",
+  "EZBAR": "EZ Bar Rack",
+  "BBRCK": "Barbell Rack",
+  "PLTRK": "Plate Storage Rack",
+  "KBRCK": "Kettlebell Rack",
+  "MEDBL": "Medicine Ball Rack",
+  "BAND": "Bands / Accessories Station",
+  "TRX": "TRX / Suspension Trainer",
+  "BOXJM": "Plyo Box Area",
 
-    function writeSets(machineId, sets) {
-      localStorage.setItem(storageKey(machineId), JSON.stringify(sets));
-    }
+  "PLANK": "Plank Station / Mat Area",
+  "HANGK": "Hanging Knee Raise Station",
+  "ABWHL": "Ab Wheel Area",
+  "PALLF": "Pallof Press Station",
 
-    function nowIso() {
-      const d = new Date();
-      return d.toISOString();
-    }
+  "ASSLT": "Air Bike (Assault-Style)",
+  "SKIER": "SkiErg",
+  "CURVE": "Curved Manual Treadmill",
+  "STEP": "Step Mill / Stepper",
+  "SPIN": "Spin Bike",
+  "ARC": "Arc Trainer"
+};
 
-    function prettyTime(iso) {
-      try {
-        return new Date(iso).toLocaleString();
-      } catch {
-        return iso;
-      }
-    }
+const machineName = machineId
+  ? (MACHINE_MAP[machineId] || `Machine (${machineId})`)
+  : "Scan a machine QR code to begin";
 
-    function renderHistory(machineId) {
-      const container = $("history");
-      container.innerHTML = "";
+/* Storage: workouts per user+machine */
+function storageKeyFor(mid) {
+  return `scanliftlog_workouts_v1:${userId}:${mid}`;
+}
+function loadWorkouts() {
+  if (!machineId) return [];
+  return safeJSONParse(localStorage.getItem(storageKeyFor(machineId)) || "[]", []);
+}
+function saveWorkouts(arr) {
+  if (!machineId) return;
+  localStorage.setItem(storageKeyFor(machineId), JSON.stringify(arr));
+}
 
-      if (!machineId) {
-        $("historyFoot").textContent = "Scan a machine QR code to view history.";
-        return;
-      }
+/* NEW: Export all machines for this user from localStorage */
+function exportAllDataForUser() {
+  const prefix = `scanliftlog_workouts_v1:${userId}:`;
 
-      const sets = readSets(machineId);
+  const exportObj = {
+    app: "ScanLiftLog",
+    version: "v1",
+    exportedAt: new Date().toISOString(),
+    userId: userId,
+    machines: {}
+  };
 
-      if (!sets.length) {
-        $("historyFoot").textContent = "No sets saved for this machine yet.";
-        return;
-      }
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(prefix)) continue;
 
-      $("historyFoot").textContent = `Saved sets: ${sets.length}`;
+    const mid = k.slice(prefix.length); // e.g. "DBRCK"
+    const raw = localStorage.getItem(k);
+    exportObj.machines[mid] = safeJSONParse(raw || "[]", []);
+  }
 
-      // newest first
-      sets.slice().reverse().forEach(s => {
-        const div = document.createElement("div");
-        div.className = "item";
-        div.innerHTML = `
-          <div><strong>${escapeHtml(s.exercise || machineId.toUpperCase())}</strong></div>
-          <div class="meta">${escapeHtml(String(s.weight || ""))} lb × ${escapeHtml(String(s.reps || ""))} reps</div>
-          <div class="meta">${escapeHtml(prettyTime(s.ts))}</div>
-        `;
-        container.appendChild(div);
-      });
-    }
+  if (Object.keys(exportObj.machines).length === 0) {
+    alert("No saved workouts found on this device to download yet.");
+    return;
+  }
 
-    function escapeHtml(str) {
-      return String(str)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
 
-    function setContextTag(machineId) {
-      const host = window.location.host;
-      if (!machineId) {
-        $("contextTag").textContent = `${host} · no machine`;
-      } else {
-        $("contextTag").textContent = `${host} · machine: ${machineId}`;
-      }
-    }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `scanliftlog_export_${userId.slice(0,8)}_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 
-    function setMachineUI(machineId) {
-      if (!machineId) {
-        $("machineTitle").textContent = "Choose a machine";
-        $("machineSubtitle").textContent = "Scan a QR code on a machine to load its log screen automatically.";
-        $("statusLine").textContent = "";
-        return;
-      }
+  URL.revokeObjectURL(url);
+}
 
-      $("machineTitle").textContent = `Machine: ${machineId.toUpperCase()}`;
-      $("machineSubtitle").textContent = "Log your sets below. Data is stored on this device only.";
-      $("statusLine").textContent = "";
-    }
+/* ---------- UI Elements ---------- */
+const setsContainer = document.getElementById('setsContainer');
+const dateInput = document.getElementById('dateInput');
+const notesInput = document.getElementById('notesInput');
+const exerciseInput = document.getElementById('exerciseInput');
 
-    function copyToClipboard(text) {
-      return navigator.clipboard.writeText(text);
-    }
+/* ---------- Sets UI ---------- */
+function createSetRow(setIndex, weight="", reps="") {
+  const row = document.createElement('div');
+  row.className = 'setRow';
+  row.dataset.index = String(setIndex);
 
-    // ---- Main ----
-    (function main() {
-      // Initialize machine from URL
-      let machineId = getMachineFromUrl();
+  const badge = document.createElement('div');
+  badge.className = 'setBadge';
+  badge.textContent = String(setIndex + 1);
 
-      // Populate input fields
-      $("machineInput").value = machineId || "";
+  const w = document.createElement('input');
+  w.placeholder = 'e.g., 180';
+  w.inputMode = 'decimal';
+  w.value = weight;
 
-      setContextTag(machineId);
-      setMachineUI(machineId);
-      renderHistory(machineId);
+  const r = document.createElement('input');
+  r.placeholder = 'e.g., 10';
+  r.inputMode = 'numeric';
+  r.value = reps;
 
-      // Save set
-      $("saveBtn").addEventListener("click", () => {
-        const m = normalizeSlug($("machineInput").value);
-        const exercise = $("exerciseInput").value.trim();
-        const weight = $("weightInput").value.trim();
-        const reps = $("repsInput").value.trim();
+  const del = document.createElement('button');
+  del.className = 'iconBtn danger';
+  del.type = 'button';
+  del.textContent = '−';
+  del.title = 'Remove set';
+  del.onclick = () => {
+    row.remove();
+    renumberSets();
+  };
 
-        if (!m) {
-          $("statusLine").textContent = "Enter a machine ID (or scan a QR code) before saving.";
-          return;
-        }
+  row.appendChild(badge);
+  row.appendChild(w);
+  row.appendChild(r);
+  row.appendChild(del);
+  return row;
+}
 
-        if (!weight || !reps) {
-          $("statusLine").textContent = "Enter both weight and reps.";
-          return;
-        }
+function renumberSets() {
+  const rows = Array.from(setsContainer.querySelectorAll('.setRow'));
+  rows.forEach((row, i) => {
+    row.dataset.index = String(i);
+    row.querySelector('.setBadge').textContent = String(i + 1);
+  });
+}
 
-        // Update URL to match machine if user typed it in
-        if (m !== machineId) {
-          machineId = m;
-          setMachineInUrl(machineId);
-        }
+function addSet(weight="", reps="") {
+  const idx = setsContainer.querySelectorAll('.setRow').length;
+  setsContainer.appendChild(createSetRow(idx, weight, reps));
+}
 
-        const sets = readSets(machineId);
-        sets.push({
-          ts: nowIso(),
-          machine: machineId,
-          exercise: exercise,
-          weight: weight,
-          reps: reps
-        });
-        writeSets(machineId, sets);
+function clearCurrentSets() {
+  setsContainer.innerHTML = "";
+  addSet("", "");
+}
 
-        $("statusLine").textContent = "Saved.";
-        $("weightInput").value = "";
-        $("repsInput").value = "";
+/* ---------- Save / History ---------- */
+function readCurrentSets() {
+  const rows = Array.from(setsContainer.querySelectorAll('.setRow'));
+  const sets = rows.map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      weight: (inputs[0].value || "").trim(),
+      reps: (inputs[1].value || "").trim()
+    };
+  }).filter(s => s.weight || s.reps);
+  return sets;
+}
 
-        setContextTag(machineId);
-        setMachineUI(machineId);
-        renderHistory(machineId);
-      });
+function getTopSet(sets) {
+  let best = null;
+  let bestW = -Infinity;
+  for (const s of sets) {
+    const w = parseFloat(String(s.weight).replace(/[^0-9.]/g,''));
+    if (!Number.isNaN(w) && w > bestW) { bestW = w; best = s; }
+  }
+  return best || sets[0] || null;
+}
 
-      // Clear machine
-      $("clearBtn").addEventListener("click", () => {
-        const m = normalizeSlug($("machineInput").value || machineId);
-        if (!m) return;
+function renderHistory() {
+  const tbody = document.getElementById('historyBody');
+  tbody.innerHTML = "";
 
-        const ok = confirm(`Clear all saved sets for machine "${m}" on this device?`);
-        if (!ok) return;
+  const workouts = loadWorkouts();
+  if (!workouts.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">No workouts saved yet.</td></tr>`;
+    return;
+  }
 
-        localStorage.removeItem(storageKey(m));
-        $("statusLine").textContent = "Cleared.";
-        renderHistory(m);
-      });
+  const sorted = workouts.slice().sort((a,b) => (b.ts||0) - (a.ts||0));
+  for (const w of sorted) {
+    const top = getTopSet(w.sets || []);
+    const topText = top ? `${escapeHtml(top.weight || "—")} x ${escapeHtml(top.reps || "—")}` : "—";
 
-      // Copy test QR link (router link)
-      $("shareBtn").addEventListener("click", async () => {
-        const m = normalizeSlug($("machineInput").value || machineId);
-        if (!m) {
-          $("statusLine").textContent = "Enter a machine ID first.";
-          return;
-        }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(w.date || "")}</td>
+      <td>${(w.sets||[]).length}</td>
+      <td>${topText}</td>
+      <td>
+        <details>
+          <summary>View sets</summary>
+          ${w.exercise ? `<div class="muted" style="margin-top:6px;">Exercise: ${escapeHtml(w.exercise)}</div>` : ""}
+          ${w.notes ? `<div class="muted" style="margin-top:6px;">Notes: ${escapeHtml(w.notes)}</div>` : ""}
+          <table class="setsMini">
+            <thead><tr><th>Set</th><th>Weight</th><th>Reps</th></tr></thead>
+            <tbody>
+              ${(w.sets||[]).map((s,i)=>`
+                <tr><td>${i+1}</td><td>${escapeHtml(s.weight||"")}</td><td>${escapeHtml(s.reps||"")}</td></tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </details>
+      </td>
+      <td class="muted">${escapeHtml(w.savedAt || "")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
 
-        const url = `https://scanliftlog.com/g/${DEFAULT_GYM_SLUG}/m/${m}`;
-        try {
-          await copyToClipboard(url);
-          $("statusLine").textContent = `Copied: ${url}`;
-        } catch {
-          $("statusLine").textContent = `Copy failed. Use this link: ${url}`;
-        }
-      });
-    })();
-  </script>
+/* ---------- Wire up ---------- */
+document.getElementById('year').textContent = String(new Date().getFullYear());
+document.getElementById('machinePill').textContent = machineName;
+document.getElementById('userPill').textContent = `User: ${userId.slice(0,8)}…`;
+document.getElementById('historyScopeBadge').textContent = `Scope: ${machineId || "—"}`;
+document.getElementById('resetUserBtn').addEventListener('click', resetUser);
+
+/* NEW: Wire export button */
+document.getElementById('exportBtn').addEventListener('click', exportAllDataForUser);
+
+dateInput.value = todayISO();
+
+document.getElementById('addSetBtn').addEventListener('click', () => addSet("", ""));
+document.getElementById('clearCurrentBtn').addEventListener('click', clearCurrentSets);
+
+document.getElementById('saveWorkoutBtn').addEventListener('click', () => {
+  if (!machineId) {
+    alert("Scan a machine QR code before saving a workout.");
+    return;
+  }
+
+  const date = (dateInput.value || todayISO()).trim();
+  const notes = (notesInput.value || "").trim();
+  const exercise = (exerciseInput.value || "").trim();
+  const sets = readCurrentSets();
+
+  if (!sets.length) {
+    alert("Add at least one set (weight and/or reps) before saving.");
+    return;
+  }
+
+  const workouts = loadWorkouts();
+  workouts.push({
+    ts: Date.now(),
+    date,
+    machineId,
+    machineName,
+    exercise,
+    notes,
+    sets,
+    savedAt: nowReadable()
+  });
+  saveWorkouts(workouts);
+
+  exerciseInput.value = "";
+  notesInput.value = "";
+  clearCurrentSets();
+  renderHistory();
+});
+
+document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+  if (!confirm("Clear ALL history for this machine on this device?")) return;
+  saveWorkouts([]);
+  renderHistory();
+});
+
+/* Init */
+clearCurrentSets();
+renderHistory();
+</script>
 </body>
 </html>
