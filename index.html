@@ -8,67 +8,120 @@
   <style>
     :root { --b:#111; --g:#666; --bg:#f6f7fb; --card:#fff; --line:#e6e8f0; }
     body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--b); }
-    .wrap { max-width: 760px; margin: 48px auto; padding: 0 16px; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.05); padding: 20px; }
-    .h { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
-    .p { margin: 0 0 14px; color: var(--g); line-height: 1.5; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background:#f1f3f8; padding: 10px; border-radius: 10px; border:1px solid var(--line); overflow:auto;}
-    .btnrow { display:flex; gap:10px; flex-wrap: wrap; margin-top: 12px; }
-    .btn { display:inline-block; padding: 10px 12px; border-radius: 10px; border:1px solid var(--line); background:#fff; color:var(--b); text-decoration:none; font-weight: 600; }
-    .btn.primary { background:#111; color:#fff; border-color:#111; }
-    .small { font-size: 12px; color: var(--g); margin-top: 14px; }
+    .wrap { max-width: 860px; margin: 36px auto; padding: 0 16px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 14px; }
+    .brand { font-weight: 800; letter-spacing:.2px; font-size: 18px; }
     .tag { display:inline-block; font-size: 12px; border:1px solid var(--line); background:#fff; padding: 6px 10px; border-radius: 999px; color: var(--g); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.05); padding: 18px; }
+    .grid { display:grid; grid-template-columns: 1fr; gap:12px; }
+    @media (min-width: 860px){ .grid { grid-template-columns: 1.2fr .8fr; } }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    p { margin: 0 0 12px; color: var(--g); line-height: 1.5; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    label { font-size: 12px; color: var(--g); display:block; margin: 0 0 4px; }
+    input, select, button, textarea {
+      font: inherit;
+      border:1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 10px;
+      background:#fff;
+      color: var(--b);
+    }
+    input, select { min-width: 160px; }
+    button { cursor:pointer; font-weight: 700; }
+    button.primary { background:#111; color:#fff; border-color:#111; }
+    button.danger { background:#fff; color:#b00020; border-color:#f0c9d1; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background:#f1f3f8; padding: 10px; border-radius: 10px; border:1px solid var(--line); overflow:auto; }
+    .hr { height:1px; background: var(--line); margin: 14px 0; }
+    .list { display:flex; flex-direction:column; gap:10px; }
+    .item { border:1px solid var(--line); border-radius: 12px; padding: 12px; background:#fff; }
+    .item .meta { font-size: 12px; color: var(--g); margin-top: 6px; }
+    .small { font-size: 12px; color: var(--g); margin-top: 10px; }
+    .warn { color:#8a5a00; }
   </style>
 </head>
+
 <body>
   <div class="wrap">
-    <div class="card" id="card">
-      <div class="tag" id="statusTag">ScanLiftLog</div>
-      <h1 class="h" id="title">Loading…</h1>
-      <p class="p" id="msg">Processing your request.</p>
-      <div class="mono" id="details" style="display:none;"></div>
-      <div class="btnrow" id="actions" style="display:none;"></div>
-      <div class="small" id="foot"></div>
+    <div class="top">
+      <div class="brand">ScanLiftLog</div>
+      <div class="tag" id="contextTag">Loading…</div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: Logging -->
+      <div class="card">
+        <h1 id="machineTitle">Choose a machine</h1>
+        <p id="machineSubtitle">Scan a QR code on a machine to load its log screen automatically.</p>
+
+        <div class="row">
+          <div>
+            <label for="machineInput">Machine ID</label>
+            <input id="machineInput" placeholder="e.g., legpr" />
+          </div>
+
+          <div>
+            <label for="exerciseInput">Exercise</label>
+            <input id="exerciseInput" placeholder="Optional note (e.g., Leg Press)" />
+          </div>
+
+          <div>
+            <label for="weightInput">Weight</label>
+            <input id="weightInput" inputmode="decimal" placeholder="e.g., 270" />
+          </div>
+
+          <div>
+            <label for="repsInput">Reps</label>
+            <input id="repsInput" inputmode="numeric" placeholder="e.g., 10" />
+          </div>
+
+          <div style="align-self:flex-end;">
+            <button class="primary" id="saveBtn">Save Set</button>
+          </div>
+        </div>
+
+        <div class="small">
+          Supports both formats:
+          <div class="mono" style="margin-top:8px;">
+            Old:  ?machine=LEGPR<br/>
+            New:  /m/legpr  (from your router redirect)
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="row">
+          <button id="shareBtn">Copy QR Test Link</button>
+          <button class="danger" id="clearBtn">Clear This Machine</button>
+        </div>
+
+        <div class="small warn" id="statusLine"></div>
+      </div>
+
+      <!-- RIGHT: History -->
+      <div class="card">
+        <h1 style="margin-bottom:10px;">History</h1>
+        <div id="history" class="list"></div>
+        <div class="small" id="historyFoot"></div>
+      </div>
     </div>
   </div>
 
   <script>
     /**
-     * ScanLiftLog Router (GitHub Pages)
+     * ScanLiftLog (Gym App)
+     * Paste this SAME file into both index.html and 404.html in your gym repo.
      *
-     * URL formats supported:
-     *  1) Path style (recommended for QR codes):
-     *     https://scanliftlog.com/g/{gym}/m/{machine}
-     *
-     *  2) Query style (optional):
-     *     https://scanliftlog.com/?gym={gym}&machine={machine}
-     *
-     * What this file does:
-     *  - Extracts gym + machine from URL
-     *  - Looks up gym in a local registry (below)
-     *  - If gym ACTIVE -> redirects to that gym’s site, preserving the rest of the path
-     *  - If gym DISABLED/unknown -> shows a clean “inactive” or “not found” page
-     *
-     * Next step later:
-     *  - Replace the local GYM_REGISTRY with a fetch() to a backend endpoint.
+     * Why: GitHub Pages returns 404 for deep links like /m/legpr unless you provide a 404.html fallback.
+     * This is a typical “SPA on GitHub Pages” approach.
      */
 
-    // 1) Registry: add your 5 pilot gyms here.
-    //    url = the base URL of that gym’s deployed site (typically its GitHub Pages URL).
-    //    IMPORTANT: include the trailing slash.
-   const GYM_REGISTRY = {
-  "main": {
-    active: true,
-    name: "Scan Lift Log Test Gym",
-    url: "https://spiazzi11-png.github.io/scanliftlog/"
-  }
-};
+    // ---- Config (for your current test gym) ----
+    // This gymId is only used for the "Copy QR Test Link" helper button.
+    // Your router controls real gym routing; this can remain "main" for now.
+    const DEFAULT_GYM_SLUG = "main";
 
-    // 2) Behavior toggles
-    const SHOW_DEBUG = true;       // set true to show debug block in browser
-    const REDIRECT_DELAY_MS = 250;  // small delay so users see “Redirecting…” briefly
-
-    // ---------- Helpers ----------
+    // ---- Helpers ----
     const $ = (id) => document.getElementById(id);
 
     function normalizeSlug(v) {
@@ -80,158 +133,220 @@
         .replace(/^-|-$/g, "");
     }
 
-    function parseRequest() {
+    function getMachineFromUrl() {
       const url = new URL(window.location.href);
-      const path = url.pathname || "/";
-      const parts = path.split("/").filter(Boolean); // remove empty
 
-      // Path style: /g/{gym}/m/{machine}
-      let gym = null, machine = null;
+      // 1) Query param support (old)
+      let m = url.searchParams.get("machine");
+      if (m) return normalizeSlug(m);
 
-      const gIndex = parts.indexOf("g");
-      if (gIndex !== -1 && parts.length > gIndex + 1) gym = parts[gIndex + 1];
-
+      // 2) Path support (new): /m/<machineId>
+      const parts = url.pathname.split("/").filter(Boolean);
       const mIndex = parts.indexOf("m");
-      if (mIndex !== -1 && parts.length > mIndex + 1) machine = parts[mIndex + 1];
+      if (mIndex !== -1 && parts[mIndex + 1]) return normalizeSlug(parts[mIndex + 1]);
 
-      // Query fallback
-      if (!gym) gym = url.searchParams.get("gym");
-      if (!machine) machine = url.searchParams.get("machine");
-
-      gym = normalizeSlug(gym);
-      machine = normalizeSlug(machine);
-
-      // Preserve original request path beyond /g/{gym}
-      // Example: /g/smithtown/m/legpress-01 -> suffix = "m/legpress-01"
-      let suffix = "";
-      if (gIndex !== -1) {
-        const afterGym = parts.slice(gIndex + 2); // after g/{gym}
-        suffix = afterGym.join("/");
-      } else {
-        // If request didn’t use /g/, preserve full path (minus leading slash)
-        suffix = parts.join("/");
-      }
-
-      return {
-        fullUrl: url.toString(),
-        host: url.host,
-        path,
-        gym,
-        machine,
-        suffix, // no leading slash
-        query: url.search
-      };
+      return "";
     }
 
-    function setUI({ tag, title, msg, details, actions, foot }) {
-      $("statusTag").textContent = tag || "ScanLiftLog";
-      $("title").textContent = title || "";
-      $("msg").textContent = msg || "";
-      if (details) {
-        $("details").style.display = "block";
-        $("details").textContent = details;
-      } else {
-        $("details").style.display = "none";
-      }
+    function setMachineInUrl(machineId) {
+      const m = normalizeSlug(machineId);
+      const url = new URL(window.location.href);
 
-      if (actions && actions.length) {
-        $("actions").style.display = "flex";
-        $("actions").innerHTML = "";
-        actions.forEach(a => {
-          const el = document.createElement("a");
-          el.className = "btn" + (a.primary ? " primary" : "");
-          el.href = a.href;
-          el.textContent = a.label;
-          $("actions").appendChild(el);
-        });
-      } else {
-        $("actions").style.display = "none";
-      }
+      // We will standardize on path form: /m/<machineId>
+      // Keep it simple: if you're hosted at /scanliftlog/ on GitHub Pages, preserve that base path.
+      // Example base path on GH Pages: /scanliftlog/
+      // This script lives at that base, so we keep the first segment as the repo name when present.
+      const parts = url.pathname.split("/").filter(Boolean);
+      const repoBase = parts.length ? parts[0] : ""; // "scanliftlog" (repo name) on GH Pages
 
-      $("foot").textContent = foot || "";
+      const newPath = repoBase ? `/${repoBase}/m/${m}` : `/m/${m}`;
+      url.pathname = newPath;
+
+      // Remove old query param if present
+      url.searchParams.delete("machine");
+
+      window.history.replaceState({}, "", url.toString());
     }
 
-    function buildRedirectUrl(gymBaseUrl, suffix, originalQuery) {
-      // Redirect to: {gymBaseUrl}{suffix}{originalQuery}
-      // Ensure proper slashes
-      const base = gymBaseUrl.endsWith("/") ? gymBaseUrl : (gymBaseUrl + "/");
-      const cleanSuffix = (suffix || "").replace(/^\/+/, "");
-      const url = base + cleanSuffix;
-
-      // Preserve query string if it contains useful info (optional).
-      // Most of the time your gym app won’t need the router query params, but it doesn’t hurt.
-      return url + (originalQuery || "");
+    function storageKey(machineId) {
+      return `scanliftlog:machine:${normalizeSlug(machineId)}:sets`;
     }
 
-    // ---------- Main ----------
+    function readSets(machineId) {
+      try {
+        const raw = localStorage.getItem(storageKey(machineId));
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function writeSets(machineId, sets) {
+      localStorage.setItem(storageKey(machineId), JSON.stringify(sets));
+    }
+
+    function nowIso() {
+      const d = new Date();
+      return d.toISOString();
+    }
+
+    function prettyTime(iso) {
+      try {
+        return new Date(iso).toLocaleString();
+      } catch {
+        return iso;
+      }
+    }
+
+    function renderHistory(machineId) {
+      const container = $("history");
+      container.innerHTML = "";
+
+      if (!machineId) {
+        $("historyFoot").textContent = "Scan a machine QR code to view history.";
+        return;
+      }
+
+      const sets = readSets(machineId);
+
+      if (!sets.length) {
+        $("historyFoot").textContent = "No sets saved for this machine yet.";
+        return;
+      }
+
+      $("historyFoot").textContent = `Saved sets: ${sets.length}`;
+
+      // newest first
+      sets.slice().reverse().forEach(s => {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <div><strong>${escapeHtml(s.exercise || machineId.toUpperCase())}</strong></div>
+          <div class="meta">${escapeHtml(String(s.weight || ""))} lb × ${escapeHtml(String(s.reps || ""))} reps</div>
+          <div class="meta">${escapeHtml(prettyTime(s.ts))}</div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function setContextTag(machineId) {
+      const host = window.location.host;
+      if (!machineId) {
+        $("contextTag").textContent = `${host} · no machine`;
+      } else {
+        $("contextTag").textContent = `${host} · machine: ${machineId}`;
+      }
+    }
+
+    function setMachineUI(machineId) {
+      if (!machineId) {
+        $("machineTitle").textContent = "Choose a machine";
+        $("machineSubtitle").textContent = "Scan a QR code on a machine to load its log screen automatically.";
+        $("statusLine").textContent = "";
+        return;
+      }
+
+      $("machineTitle").textContent = `Machine: ${machineId.toUpperCase()}`;
+      $("machineSubtitle").textContent = "Log your sets below. Data is stored on this device only.";
+      $("statusLine").textContent = "";
+    }
+
+    function copyToClipboard(text) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    // ---- Main ----
     (function main() {
-      const req = parseRequest();
+      // Initialize machine from URL
+      let machineId = getMachineFromUrl();
 
-      // If someone hits the bare domain, show a friendly landing page.
-      if (!req.gym) {
-        setUI({
-          tag: "ScanLiftLog",
-          title: "ScanLiftLog is online",
-          msg: "This domain routes QR scans to the correct gym location. To test routing, use a URL like /g/{gym}/m/{machine}.",
-          details: SHOW_DEBUG ? JSON.stringify(req, null, 2) : null,
-          actions: [
-            { label: "Example: /g/demo/m/legpress-01", href: "/g/demo/m/legpress-01", primary: true }
-          ],
-          foot: "If you are a gym manager, request an Admin QR from your ScanLiftLog contact."
+      // Populate input fields
+      $("machineInput").value = machineId || "";
+
+      setContextTag(machineId);
+      setMachineUI(machineId);
+      renderHistory(machineId);
+
+      // Save set
+      $("saveBtn").addEventListener("click", () => {
+        const m = normalizeSlug($("machineInput").value);
+        const exercise = $("exerciseInput").value.trim();
+        const weight = $("weightInput").value.trim();
+        const reps = $("repsInput").value.trim();
+
+        if (!m) {
+          $("statusLine").textContent = "Enter a machine ID (or scan a QR code) before saving.";
+          return;
+        }
+
+        if (!weight || !reps) {
+          $("statusLine").textContent = "Enter both weight and reps.";
+          return;
+        }
+
+        // Update URL to match machine if user typed it in
+        if (m !== machineId) {
+          machineId = m;
+          setMachineInUrl(machineId);
+        }
+
+        const sets = readSets(machineId);
+        sets.push({
+          ts: nowIso(),
+          machine: machineId,
+          exercise: exercise,
+          weight: weight,
+          reps: reps
         });
-        return;
-      }
+        writeSets(machineId, sets);
 
-      const gymKey = req.gym;
-      const gym = GYM_REGISTRY[gymKey];
+        $("statusLine").textContent = "Saved.";
+        $("weightInput").value = "";
+        $("repsInput").value = "";
 
-      // Unknown gym
-      if (!gym) {
-        setUI({
-          tag: "Location not found",
-          title: "This ScanLiftLog location isn’t recognized",
-          msg: "If you believe this is a mistake, please contact the front desk or ScanLiftLog support.",
-          details: SHOW_DEBUG ? JSON.stringify(req, null, 2) : null,
-          actions: [
-            { label: "Go to ScanLiftLog home", href: "/", primary: true }
-          ],
-          foot: "Tip: Double-check the QR code sticker matches the machine."
-        });
-        return;
-      }
-
-      // Gym disabled
-      if (!gym.active) {
-        setUI({
-          tag: "Service inactive",
-          title: `${gym.name || "This gym"} is currently inactive`,
-          msg: "ScanLiftLog service is not active for this location. Please contact the front desk.",
-          details: SHOW_DEBUG ? JSON.stringify(req, null, 2) : null,
-          actions: [
-            { label: "Go to ScanLiftLog home", href: "/", primary: true }
-          ],
-          foot: "If you are the gym manager and want to reactivate, contact ScanLiftLog."
-        });
-        return;
-      }
-
-      // Gym active -> redirect
-      const redirectUrl = buildRedirectUrl(gym.url, req.suffix, req.query);
-
-      setUI({
-        tag: "Redirecting…",
-        title: gym.name ? `Routing to ${gym.name}` : "Routing to your gym",
-        msg: "One moment—sending you to the correct location.",
-        details: SHOW_DEBUG ? `Redirect URL:\n${redirectUrl}\n\nRequest:\n${JSON.stringify(req, null, 2)}` : null,
-        actions: [
-          { label: "Continue if not redirected", href: redirectUrl, primary: true }
-        ],
-        foot: "If you scanned this QR code at a machine, you’re in the right place."
+        setContextTag(machineId);
+        setMachineUI(machineId);
+        renderHistory(machineId);
       });
 
-      setTimeout(() => {
-        window.location.replace(redirectUrl);
-      }, REDIRECT_DELAY_MS);
+      // Clear machine
+      $("clearBtn").addEventListener("click", () => {
+        const m = normalizeSlug($("machineInput").value || machineId);
+        if (!m) return;
+
+        const ok = confirm(`Clear all saved sets for machine "${m}" on this device?`);
+        if (!ok) return;
+
+        localStorage.removeItem(storageKey(m));
+        $("statusLine").textContent = "Cleared.";
+        renderHistory(m);
+      });
+
+      // Copy test QR link (router link)
+      $("shareBtn").addEventListener("click", async () => {
+        const m = normalizeSlug($("machineInput").value || machineId);
+        if (!m) {
+          $("statusLine").textContent = "Enter a machine ID first.";
+          return;
+        }
+
+        const url = `https://scanliftlog.com/g/${DEFAULT_GYM_SLUG}/m/${m}`;
+        try {
+          await copyToClipboard(url);
+          $("statusLine").textContent = `Copied: ${url}`;
+        } catch {
+          $("statusLine").textContent = `Copy failed. Use this link: ${url}`;
+        }
+      });
     })();
   </script>
 </body>
