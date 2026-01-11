@@ -1,11 +1,236 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ScanLiftLog</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <style>
+    :root { --b:#111; --g:#666; --bg:#f6f7fb; --card:#fff; --line:#e6e8f0; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--b); }
+    .wrap { max-width: 760px; margin: 48px auto; padding: 0 16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.05); padding: 20px; }
+    .h { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+    .p { margin: 0 0 14px; color: var(--g); line-height: 1.5; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background:#f1f3f8; padding: 10px; border-radius: 10px; border:1px solid var(--line); overflow:auto;}
+    .btnrow { display:flex; gap:10px; flex-wrap: wrap; margin-top: 12px; }
+    .btn { display:inline-block; padding: 10px 12px; border-radius: 10px; border:1px solid var(--line); background:#fff; color:var(--b); text-decoration:none; font-weight: 600; }
+    .btn.primary { background:#111; color:#fff; border-color:#111; }
+    .small { font-size: 12px; color: var(--g); margin-top: 14px; }
+    .tag { display:inline-block; font-size: 12px; border:1px solid var(--line); background:#fff; padding: 6px 10px; border-radius: 999px; color: var(--g); }
+  </style>
 </head>
 <body>
-  <h1>ScanLiftLog Router</h1>
-  <p>System online.</p>
+  <div class="wrap">
+    <div class="card" id="card">
+      <div class="tag" id="statusTag">ScanLiftLog</div>
+      <h1 class="h" id="title">Loading…</h1>
+      <p class="p" id="msg">Processing your request.</p>
+      <div class="mono" id="details" style="display:none;"></div>
+      <div class="btnrow" id="actions" style="display:none;"></div>
+      <div class="small" id="foot"></div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ScanLiftLog Router (GitHub Pages)
+     *
+     * URL formats supported:
+     *  1) Path style (recommended for QR codes):
+     *     https://scanliftlog.com/g/{gym}/m/{machine}
+     *
+     *  2) Query style (optional):
+     *     https://scanliftlog.com/?gym={gym}&machine={machine}
+     *
+     * What this file does:
+     *  - Extracts gym + machine from URL
+     *  - Looks up gym in a local registry (below)
+     *  - If gym ACTIVE -> redirects to that gym’s site, preserving the rest of the path
+     *  - If gym DISABLED/unknown -> shows a clean “inactive” or “not found” page
+     *
+     * Next step later:
+     *  - Replace the local GYM_REGISTRY with a fetch() to a backend endpoint.
+     */
+
+    // 1) Registry: add your 5 pilot gyms here.
+    //    url = the base URL of that gym’s deployed site (typically its GitHub Pages URL).
+    //    IMPORTANT: include the trailing slash.
+    const GYM_REGISTRY = {
+      // Example gyms — replace with your real ones:
+      // "smithtown": { active: true,  name: "Smithtown Fitness", url: "https://spiazzi11-png.github.io/scanliftlog-smithtown/" },
+      // "bayshore":  { active: false, name: "Bayshore Gym",      url: "https://spiazzi11-png.github.io/scanliftlog-bayshore/" }
+    };
+
+    // 2) Behavior toggles
+    const SHOW_DEBUG = false;       // set true to show debug block in browser
+    const REDIRECT_DELAY_MS = 250;  // small delay so users see “Redirecting…” briefly
+
+    // ---------- Helpers ----------
+    const $ = (id) => document.getElementById(id);
+
+    function normalizeSlug(v) {
+      return String(v || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+    }
+
+    function parseRequest() {
+      const url = new URL(window.location.href);
+      const path = url.pathname || "/";
+      const parts = path.split("/").filter(Boolean); // remove empty
+
+      // Path style: /g/{gym}/m/{machine}
+      let gym = null, machine = null;
+
+      const gIndex = parts.indexOf("g");
+      if (gIndex !== -1 && parts.length > gIndex + 1) gym = parts[gIndex + 1];
+
+      const mIndex = parts.indexOf("m");
+      if (mIndex !== -1 && parts.length > mIndex + 1) machine = parts[mIndex + 1];
+
+      // Query fallback
+      if (!gym) gym = url.searchParams.get("gym");
+      if (!machine) machine = url.searchParams.get("machine");
+
+      gym = normalizeSlug(gym);
+      machine = normalizeSlug(machine);
+
+      // Preserve original request path beyond /g/{gym}
+      // Example: /g/smithtown/m/legpress-01 -> suffix = "m/legpress-01"
+      let suffix = "";
+      if (gIndex !== -1) {
+        const afterGym = parts.slice(gIndex + 2); // after g/{gym}
+        suffix = afterGym.join("/");
+      } else {
+        // If request didn’t use /g/, preserve full path (minus leading slash)
+        suffix = parts.join("/");
+      }
+
+      return {
+        fullUrl: url.toString(),
+        host: url.host,
+        path,
+        gym,
+        machine,
+        suffix, // no leading slash
+        query: url.search
+      };
+    }
+
+    function setUI({ tag, title, msg, details, actions, foot }) {
+      $("statusTag").textContent = tag || "ScanLiftLog";
+      $("title").textContent = title || "";
+      $("msg").textContent = msg || "";
+      if (details) {
+        $("details").style.display = "block";
+        $("details").textContent = details;
+      } else {
+        $("details").style.display = "none";
+      }
+
+      if (actions && actions.length) {
+        $("actions").style.display = "flex";
+        $("actions").innerHTML = "";
+        actions.forEach(a => {
+          const el = document.createElement("a");
+          el.className = "btn" + (a.primary ? " primary" : "");
+          el.href = a.href;
+          el.textContent = a.label;
+          $("actions").appendChild(el);
+        });
+      } else {
+        $("actions").style.display = "none";
+      }
+
+      $("foot").textContent = foot || "";
+    }
+
+    function buildRedirectUrl(gymBaseUrl, suffix, originalQuery) {
+      // Redirect to: {gymBaseUrl}{suffix}{originalQuery}
+      // Ensure proper slashes
+      const base = gymBaseUrl.endsWith("/") ? gymBaseUrl : (gymBaseUrl + "/");
+      const cleanSuffix = (suffix || "").replace(/^\/+/, "");
+      const url = base + cleanSuffix;
+
+      // Preserve query string if it contains useful info (optional).
+      // Most of the time your gym app won’t need the router query params, but it doesn’t hurt.
+      return url + (originalQuery || "");
+    }
+
+    // ---------- Main ----------
+    (function main() {
+      const req = parseRequest();
+
+      // If someone hits the bare domain, show a friendly landing page.
+      if (!req.gym) {
+        setUI({
+          tag: "ScanLiftLog",
+          title: "ScanLiftLog is online",
+          msg: "This domain routes QR scans to the correct gym location. To test routing, use a URL like /g/{gym}/m/{machine}.",
+          details: SHOW_DEBUG ? JSON.stringify(req, null, 2) : null,
+          actions: [
+            { label: "Example: /g/demo/m/legpress-01", href: "/g/demo/m/legpress-01", primary: true }
+          ],
+          foot: "If you are a gym manager, request an Admin QR from your ScanLiftLog contact."
+        });
+        return;
+      }
+
+      const gymKey = req.gym;
+      const gym = GYM_REGISTRY[gymKey];
+
+      // Unknown gym
+      if (!gym) {
+        setUI({
+          tag: "Location not found",
+          title: "This ScanLiftLog location isn’t recognized",
+          msg: "If you believe this is a mistake, please contact the front desk or ScanLiftLog support.",
+          details: SHOW_DEBUG ? JSON.stringify(req, null, 2) : null,
+          actions: [
+            { label: "Go to ScanLiftLog home", href: "/", primary: true }
+          ],
+          foot: "Tip: Double-check the QR code sticker matches the machine."
+        });
+        return;
+      }
+
+      // Gym disabled
+      if (!gym.active) {
+        setUI({
+          tag: "Service inactive",
+          title: `${gym.name || "This gym"} is currently inactive`,
+          msg: "ScanLiftLog service is not active for this location. Please contact the front desk.",
+          details: SHOW_DEBUG ? JSON.stringify(req, null, 2) : null,
+          actions: [
+            { label: "Go to ScanLiftLog home", href: "/", primary: true }
+          ],
+          foot: "If you are the gym manager and want to reactivate, contact ScanLiftLog."
+        });
+        return;
+      }
+
+      // Gym active -> redirect
+      const redirectUrl = buildRedirectUrl(gym.url, req.suffix, req.query);
+
+      setUI({
+        tag: "Redirecting…",
+        title: gym.name ? `Routing to ${gym.name}` : "Routing to your gym",
+        msg: "One moment—sending you to the correct location.",
+        details: SHOW_DEBUG ? `Redirect URL:\n${redirectUrl}\n\nRequest:\n${JSON.stringify(req, null, 2)}` : null,
+        actions: [
+          { label: "Continue if not redirected", href: redirectUrl, primary: true }
+        ],
+        foot: "If you scanned this QR code at a machine, you’re in the right place."
+      });
+
+      setTimeout(() => {
+        window.location.replace(redirectUrl);
+      }, REDIRECT_DELAY_MS);
+    })();
+  </script>
 </body>
 </html>
