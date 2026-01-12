@@ -15,7 +15,7 @@
     .pill { font-size:12px; padding:8px 10px; border:1px solid var(--l); background:#fff; border-radius:999px; }
     .card { margin-top:14px; background:var(--card); border:1px solid var(--l); border-radius:14px; padding:14px; }
     label { display:block; font-size: 12px; color:var(--g); margin: 0 0 6px; }
-    input { width: 100%; box-sizing:border-box; padding:10px 12px; border:1px solid #ddd; border-radius:12px; font-size:14px; background:#fff; }
+    input, select { width: 100%; box-sizing:border-box; padding:10px 12px; border:1px solid #ddd; border-radius:12px; font-size:14px; background:#fff; }
     button { padding:10px 12px; border-radius:12px; border:1px solid #ddd; background:#fff; cursor:pointer; font-weight:800; }
     button.primary { border:0; background:#111; color:#fff; }
     button.danger { border:0; background:#b00020; color:#fff; }
@@ -47,6 +47,9 @@
 
     /* Tiny helper button inside pills */
     .pillBtn { border:0; background:transparent; cursor:pointer; font-weight:900; text-decoration:underline; padding:0; font-size:12px; opacity:.85; }
+
+    /* Cardio container spacing */
+    .cardioHeader { font-weight:900; }
   </style>
 </head>
 <body>
@@ -62,6 +65,8 @@
         <div class="pill" id="machinePill">Loading…</div>
         <div class="pill" id="userPill">User: …</div>
         <div class="pill"><button class="pillBtn" id="downloadBtn" type="button">Download Data</button></div>
+        <div class="pill"><button class="pillBtn" id="uploadBtn" type="button">Upload Data</button></div>
+        <input id="uploadFileInput" type="file" accept="application/json,.json" style="display:none;" />
         <div class="pill"><button class="pillBtn" id="resetUserBtn" type="button">Reset User ID</button></div>
       </div>
     </div>
@@ -89,26 +94,38 @@
 
       <div class="hr"></div>
 
-      <div style="font-weight:900;">Sets</div>
-      <div class="muted" style="margin-top:6px;">Use + to add sets. Each set stores weight and reps.</div>
+      <!-- Strength (sets) -->
+      <div id="strengthSection">
+        <div style="font-weight:900;">Sets</div>
+        <div class="muted" style="margin-top:6px;">Use + to add sets. Each set stores weight and reps.</div>
 
-      <div class="setsHeader">
-        <div class="muted">Set</div>
-        <div class="muted">Weight</div>
-        <div class="muted">Reps</div>
-        <div class="muted">Del</div>
+        <div class="setsHeader">
+          <div class="muted">Set</div>
+          <div class="muted">Weight</div>
+          <div class="muted">Reps</div>
+          <div class="muted">Del</div>
+        </div>
+
+        <div id="setsContainer"></div>
+
+        <div class="btnrow" style="margin-top:12px;">
+          <button class="iconBtn primary" id="addSetBtn" type="button">+</button>
+          <div class="muted">Add set</div>
+        </div>
       </div>
 
-      <div id="setsContainer"></div>
+      <!-- Cardio -->
+      <div id="cardioSection" style="display:none;">
+        <div class="cardioHeader">Cardio</div>
+        <div class="muted" style="margin-top:6px;">Log time and machine stats. Minutes is required.</div>
 
-      <div class="btnrow" style="margin-top:12px;">
-        <button class="iconBtn primary" id="addSetBtn" type="button">+</button>
-        <div class="muted">Add set</div>
+        <div class="row" style="align-items:flex-end; margin-top:12px;" id="cardioFieldsRow1"></div>
+        <div class="row" style="align-items:flex-end; margin-top:12px;" id="cardioFieldsRow2"></div>
       </div>
 
       <div class="btnrow" style="margin-top:14px;">
         <button class="primary" id="saveWorkoutBtn" type="button">Save Workout</button>
-        <button id="clearCurrentBtn" type="button">Clear Current Sets</button>
+        <button id="clearCurrentBtn" type="button">Clear Current</button>
         <button class="danger" id="clearHistoryBtn" type="button">Clear All History (this machine)</button>
       </div>
     </div>
@@ -125,8 +142,8 @@
           <thead>
             <tr>
               <th style="min-width:110px;">Date</th>
-              <th style="min-width:70px;">Sets</th>
-              <th style="min-width:120px;">Top Set</th>
+              <th style="min-width:70px;">Type</th>
+              <th style="min-width:140px;">Summary</th>
               <th>Details</th>
               <th style="min-width:140px;">Saved</th>
             </tr>
@@ -185,6 +202,10 @@ function normalizeSlug(v) {
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+function toNumberOrNull(v) {
+  const n = parseFloat(String(v || "").replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? n : null;
 }
 
 /* ---------- URL Parsing (FIXED + ROBUST) ---------- */
@@ -387,7 +408,73 @@ const machineName = machineId
   ? (MACHINE_MAP[machineId] || `Machine (${machineId})`)
   : "Scan a machine QR code to begin";
 
-/* Storage: workouts per user+machine */
+/* ---------- Machine Type (DEFAULT LIST = CARDIO) ---------- */
+const CARDIO_MACHINE_IDS = [
+  "TRED","ELIP","STAIR","BIKE","ROW","SKIER","CURVE","STEP","SPIN","ARC","ASSLT"
+];
+
+const machineType = (machineId && CARDIO_MACHINE_IDS.includes(machineId)) ? "cardio" : "strength";
+
+/* ---------- Cardio Field Definitions (machine-specific) ---------- */
+function getCardioFieldDefs(mid) {
+  // Field keys stored under w.cardio.{key}
+  // "minutes" is always required for cardio.
+  const base = [
+    { key: "minutes", label: "Time (minutes)", placeholder: "e.g., 20", inputMode: "numeric", required: true },
+    { key: "calories", label: "Calories (optional)", placeholder: "e.g., 220", inputMode: "numeric", required: false }
+  ];
+
+  // Helpers
+  const distanceMi = { key: "distance", label: "Distance (miles, optional)", placeholder: "e.g., 1.5", inputMode: "decimal", required: false };
+  const distanceM = { key: "distance_m", label: "Distance (meters, optional)", placeholder: "e.g., 2000", inputMode: "numeric", required: false };
+
+  if (mid === "TRED" || mid === "CURVE") {
+    return base.concat([
+      distanceMi,
+      { key: "incline", label: "Incline % (optional)", placeholder: "e.g., 6", inputMode: "decimal", required: false },
+      { key: "speed", label: "Speed (mph, optional)", placeholder: "e.g., 6.5", inputMode: "decimal", required: false }
+    ]);
+  }
+
+  if (mid === "STAIR" || mid === "STEP") {
+    return base.concat([
+      { key: "level", label: "Level (optional)", placeholder: "e.g., 8", inputMode: "numeric", required: false }
+    ]);
+  }
+
+  if (mid === "BIKE" || mid === "SPIN" || mid === "ASSLT") {
+    return base.concat([
+      distanceMi,
+      { key: "resistance", label: "Resistance (optional)", placeholder: "e.g., 12", inputMode: "numeric", required: false }
+    ]);
+  }
+
+  if (mid === "ELIP" || mid === "ARC") {
+    return base.concat([
+      distanceMi,
+      { key: "resistance", label: "Resistance (optional)", placeholder: "e.g., 10", inputMode: "numeric", required: false },
+      { key: "incline", label: "Incline % (optional)", placeholder: "e.g., 8", inputMode: "decimal", required: false }
+    ]);
+  }
+
+  if (mid === "ROW") {
+    return base.concat([
+      distanceM,
+      { key: "pace", label: "Avg pace (optional)", placeholder: "e.g., 2:05 /500m", inputMode: "text", required: false }
+    ]);
+  }
+
+  if (mid === "SKIER") {
+    return base.concat([
+      distanceM
+    ]);
+  }
+
+  // Fallback
+  return base.concat([distanceMi]);
+}
+
+/* ---------- Storage: workouts per user+machine ---------- */
 function storageKeyFor(mid) {
   return `scanliftlog_workouts_v1:${userId}:${mid}`;
 }
@@ -434,13 +521,99 @@ function downloadData() {
   URL.revokeObjectURL(url);
 }
 
+/* ---------- Upload / Import Data ---------- */
+function isWorkoutKey(k) {
+  return typeof k === "string" && k.startsWith("scanliftlog_workouts_v1:");
+}
+
+function importDataFromObject(obj) {
+  if (!obj || typeof obj !== "object") {
+    throw new Error("Invalid file: not a JSON object.");
+  }
+  if (!Array.isArray(obj.data)) {
+    throw new Error("Invalid file: missing 'data' array.");
+  }
+
+  // Filter to only keys we allow importing (safety)
+  const incoming = obj.data
+    .filter(x => x && typeof x.key === "string")
+    .filter(x => x.key === USER_KEY || isWorkoutKey(x.key));
+
+  if (!incoming.length) {
+    throw new Error("No ScanLiftLog data found in this file.");
+  }
+
+  // Confirm overwrite if there is existing data
+  const existingRelevantKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k === USER_KEY || isWorkoutKey(k)) existingRelevantKeys.push(k);
+  }
+
+  const willOverwrite = incoming.some(x => localStorage.getItem(x.key) !== null);
+  const hasExisting = existingRelevantKeys.length > 0;
+
+  let ok = true;
+  if (hasExisting || willOverwrite) {
+    ok = confirm(
+      "This will import your ScanLiftLog data onto this device.\n\n" +
+      "If you already have ScanLiftLog data here, it may be overwritten.\n\n" +
+      "Continue?"
+    );
+  } else {
+    ok = confirm("Import ScanLiftLog data from this file onto this device?");
+  }
+
+  if (!ok) return false;
+
+  // Apply incoming data
+  for (const item of incoming) {
+    if (item.key === USER_KEY) {
+      // USER_KEY is stored as a plain string
+      const v = (typeof item.value === "string") ? item.value : String(item.value || "");
+      if (v) localStorage.setItem(USER_KEY, v);
+      continue;
+    }
+
+    // workout keys stored as JSON strings
+    localStorage.setItem(item.key, JSON.stringify(item.value ?? null));
+  }
+
+  return true;
+}
+
+function handleUploadFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read file."));
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || "");
+        const obj = JSON.parse(text);
+        const didImport = importDataFromObject(obj);
+        resolve(didImport);
+      } catch (e) {
+        reject(e instanceof Error ? e : new Error("Invalid JSON file."));
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
 /* ---------- UI Elements ---------- */
 const setsContainer = document.getElementById('setsContainer');
 const dateInput = document.getElementById('dateInput');
 const notesInput = document.getElementById('notesInput');
 const exerciseInput = document.getElementById('exerciseInput');
 
-/* ---------- Sets UI ---------- */
+const strengthSection = document.getElementById('strengthSection');
+const cardioSection = document.getElementById('cardioSection');
+const cardioFieldsRow1 = document.getElementById('cardioFieldsRow1');
+const cardioFieldsRow2 = document.getElementById('cardioFieldsRow2');
+
+let cardioInputs = {}; // { key: HTMLInputElement }
+
+/* ---------- Strength: Sets UI ---------- */
 function createSetRow(setIndex, weight="", reps="") {
   const row = document.createElement('div');
   row.className = 'setRow';
@@ -495,7 +668,6 @@ function clearCurrentSets() {
   addSet("", "");
 }
 
-/* ---------- Save / History ---------- */
 function readCurrentSets() {
   const rows = Array.from(setsContainer.querySelectorAll('.setRow'));
   const sets = rows.map(row => {
@@ -508,6 +680,92 @@ function readCurrentSets() {
   return sets;
 }
 
+/* ---------- Cardio: UI + Read ---------- */
+function clearCardioInputs() {
+  Object.values(cardioInputs).forEach(inp => { inp.value = ""; });
+}
+
+function buildCardioInputs() {
+  cardioInputs = {};
+  cardioFieldsRow1.innerHTML = "";
+  cardioFieldsRow2.innerHTML = "";
+
+  const defs = getCardioFieldDefs(machineId);
+  // Split defs into two rows for layout
+  const row1 = defs.slice(0, Math.ceil(defs.length / 2));
+  const row2 = defs.slice(Math.ceil(defs.length / 2));
+
+  function addField(rowEl, def) {
+    const col = document.createElement("div");
+    col.className = "col";
+
+    const lab = document.createElement("label");
+    lab.textContent = def.label;
+
+    const inp = document.createElement("input");
+    inp.id = `cardio_${def.key}`;
+    inp.placeholder = def.placeholder || "";
+    inp.inputMode = def.inputMode === "text" ? undefined : (def.inputMode || "text");
+    inp.type = "text";
+
+    col.appendChild(lab);
+    col.appendChild(inp);
+    rowEl.appendChild(col);
+
+    cardioInputs[def.key] = inp;
+  }
+
+  row1.forEach(def => addField(cardioFieldsRow1, def));
+  row2.forEach(def => addField(cardioFieldsRow2, def));
+}
+
+function readCardioData() {
+  const defs = getCardioFieldDefs(machineId);
+  const data = {};
+
+  for (const def of defs) {
+    const inp = cardioInputs[def.key];
+    const raw = (inp && inp.value != null) ? String(inp.value).trim() : "";
+
+    if (def.required && !raw) {
+      return { ok: false, error: `Please enter ${def.label}.` };
+    }
+
+    // Store numeric fields as numbers when possible; keep "pace" as string
+    if (def.key === "pace") {
+      if (raw) data[def.key] = raw;
+      continue;
+    }
+
+    const num = toNumberOrNull(raw);
+    if (raw && num === null) {
+      // If they typed something non-numeric for numeric field
+      return { ok: false, error: `Please enter a valid number for ${def.label}.` };
+    }
+    if (num !== null) data[def.key] = num;
+  }
+
+  return { ok: true, data };
+}
+
+function setModeUI() {
+  if (!machineId) {
+    strengthSection.style.display = "";
+    cardioSection.style.display = "none";
+    return;
+  }
+
+  if (machineType === "cardio") {
+    strengthSection.style.display = "none";
+    cardioSection.style.display = "";
+    buildCardioInputs();
+  } else {
+    strengthSection.style.display = "";
+    cardioSection.style.display = "none";
+  }
+}
+
+/* ---------- History rendering ---------- */
 function getTopSet(sets) {
   let best = null;
   let bestW = -Infinity;
@@ -516,6 +774,17 @@ function getTopSet(sets) {
     if (!Number.isNaN(w) && w > bestW) { bestW = w; best = s; }
   }
   return best || sets[0] || null;
+}
+
+function formatCardioSummary(c) {
+  if (!c) return "—";
+  const parts = [];
+  if (c.minutes != null) parts.push(`${c.minutes} min`);
+  if (c.distance != null) parts.push(`${c.distance} mi`);
+  if (c.distance_m != null) parts.push(`${c.distance_m} m`);
+  if (c.calories != null) parts.push(`${c.calories} cal`);
+  if (!parts.length) return "—";
+  return parts.join(" • ");
 }
 
 function renderHistory() {
@@ -530,32 +799,81 @@ function renderHistory() {
 
   const sorted = workouts.slice().sort((a,b) => (b.ts||0) - (a.ts||0));
   for (const w of sorted) {
-    const top = getTopSet(w.sets || []);
-    const topText = top ? `${escapeHtml(top.weight || "—")} x ${escapeHtml(top.reps || "—")}` : "—";
+    const isCardio = !!w.cardio;
+    const typeLabel = isCardio ? "Cardio" : "Strength";
+
+    let summary = "—";
+    if (isCardio) {
+      summary = formatCardioSummary(w.cardio);
+    } else {
+      const top = getTopSet(w.sets || []);
+      summary = top ? `${escapeHtml(top.weight || "—")} x ${escapeHtml(top.reps || "—")}` : "—";
+    }
 
     const tr = document.createElement('tr');
+
+    // Build details section
+    let detailsHtml = `<details><summary>View</summary>`;
+
+    if (w.exercise) detailsHtml += `<div class="muted" style="margin-top:6px;">Exercise: ${escapeHtml(w.exercise)}</div>`;
+    if (w.notes) detailsHtml += `<div class="muted" style="margin-top:6px;">Notes: ${escapeHtml(w.notes)}</div>`;
+
+    if (isCardio) {
+      const c = w.cardio || {};
+      const rows = [];
+      function addRow(label, val) {
+        if (val == null || val === "") return;
+        rows.push(`<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(String(val))}</td></tr>`);
+      }
+
+      addRow("Time (minutes)", c.minutes);
+      addRow("Calories", c.calories);
+      addRow("Distance (miles)", c.distance);
+      addRow("Distance (meters)", c.distance_m);
+      addRow("Incline %", c.incline);
+      addRow("Speed (mph)", c.speed);
+      addRow("Resistance", c.resistance);
+      addRow("Level", c.level);
+      addRow("Avg pace", c.pace);
+
+      detailsHtml += `
+        <table class="setsMini" style="margin-top:8px;">
+          <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+          <tbody>${rows.join("") || `<tr><td colspan="2" class="muted">No cardio details.</td></tr>`}</tbody>
+        </table>
+      `;
+    } else {
+      detailsHtml += `
+        <table class="setsMini" style="margin-top:8px;">
+          <thead><tr><th>Set</th><th>Weight</th><th>Reps</th></tr></thead>
+          <tbody>
+            ${(w.sets||[]).map((s,i)=>`
+              <tr><td>${i+1}</td><td>${escapeHtml(s.weight||"")}</td><td>${escapeHtml(s.reps||"")}</td></tr>
+            `).join("") || `<tr><td colspan="3" class="muted">No sets.</td></tr>`}
+          </tbody>
+        </table>
+      `;
+    }
+
+    detailsHtml += `</details>`;
+
     tr.innerHTML = `
       <td>${escapeHtml(w.date || "")}</td>
-      <td>${(w.sets||[]).length}</td>
-      <td>${topText}</td>
-      <td>
-        <details>
-          <summary>View sets</summary>
-          ${w.exercise ? `<div class="muted" style="margin-top:6px;">Exercise: ${escapeHtml(w.exercise)}</div>` : ""}
-          ${w.notes ? `<div class="muted" style="margin-top:6px;">Notes: ${escapeHtml(w.notes)}</div>` : ""}
-          <table class="setsMini">
-            <thead><tr><th>Set</th><th>Weight</th><th>Reps</th></tr></thead>
-            <tbody>
-              ${(w.sets||[]).map((s,i)=>`
-                <tr><td>${i+1}</td><td>${escapeHtml(s.weight||"")}</td><td>${escapeHtml(s.reps||"")}</td></tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </details>
-      </td>
+      <td>${typeLabel}</td>
+      <td>${summary}</td>
+      <td>${detailsHtml}</td>
       <td class="muted">${escapeHtml(w.savedAt || "")}</td>
     `;
     tbody.appendChild(tr);
+  }
+}
+
+/* ---------- Clear Current (strength vs cardio) ---------- */
+function clearCurrent() {
+  if (machineType === "cardio") {
+    clearCardioInputs();
+  } else {
+    clearCurrentSets();
   }
 }
 
@@ -568,10 +886,33 @@ document.getElementById('historyScopeBadge').textContent = `Scope: ${machineId |
 document.getElementById('resetUserBtn').addEventListener('click', resetUser);
 document.getElementById('downloadBtn').addEventListener('click', downloadData);
 
+const uploadBtn = document.getElementById('uploadBtn');
+const uploadFileInput = document.getElementById('uploadFileInput');
+
+uploadBtn.addEventListener('click', () => {
+  uploadFileInput.value = ""; // allow selecting same file twice
+  uploadFileInput.click();
+});
+
+uploadFileInput.addEventListener('change', async () => {
+  const file = uploadFileInput.files && uploadFileInput.files[0];
+  if (!file) return;
+
+  try {
+    const didImport = await handleUploadFile(file);
+    if (didImport) {
+      alert("Import complete. The page will now refresh.");
+      location.reload();
+    }
+  } catch (err) {
+    alert(err instanceof Error ? err.message : "Import failed.");
+  }
+});
+
 dateInput.value = todayISO();
 
 document.getElementById('addSetBtn').addEventListener('click', () => addSet("", ""));
-document.getElementById('clearCurrentBtn').addEventListener('click', clearCurrentSets);
+document.getElementById('clearCurrentBtn').addEventListener('click', clearCurrent);
 
 document.getElementById('saveWorkoutBtn').addEventListener('click', () => {
   if (!machineId) {
@@ -582,10 +923,37 @@ document.getElementById('saveWorkoutBtn').addEventListener('click', () => {
   const date = (dateInput.value || todayISO()).trim();
   const notes = (notesInput.value || "").trim();
   const exercise = (exerciseInput.value || "").trim();
-  const sets = readCurrentSets();
 
+  // CARDIO SAVE
+  if (machineType === "cardio") {
+    const res = readCardioData();
+    if (!res.ok) {
+      alert(res.error || "Please complete the cardio log.");
+      return;
+    }
+
+    const workouts = loadWorkouts();
+    workouts.push({
+      ts: Date.now(),
+      date,
+      exercise,
+      notes,
+      cardio: res.data,
+      savedAt: nowReadable()
+    });
+    saveWorkouts(workouts);
+
+    exerciseInput.value = "";
+    notesInput.value = "";
+    clearCardioInputs();
+    renderHistory();
+    return;
+  }
+
+  // STRENGTH SAVE
+  const sets = readCurrentSets();
   if (!sets.length) {
-    alert("Add at least one set (weight and/or reps) before saving.");
+    alert("Add at least one set (weight and/or reps) before saving a workout.");
     return;
   }
 
@@ -613,7 +981,12 @@ document.getElementById('clearHistoryBtn').addEventListener('click', () => {
 });
 
 /* Init */
-clearCurrentSets();
+setModeUI();
+if (machineType !== "cardio") {
+  clearCurrentSets();
+} else {
+  clearCardioInputs();
+}
 renderHistory();
 </script>
 </body>
